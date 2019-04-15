@@ -1,125 +1,288 @@
 {
-    "if": {
-      "allOf": [
-        {
-          "field": "type",
-          "equals": "Microsoft.Compute/virtualMachines"
-        },
-        {
-          "field": "Microsoft.Compute/imagePublisher",
-          "equals": "MicrosoftWindowsServer"
-        },
-        {
-          "field": "Microsoft.Compute/imageOffer",
-          "equals": "WindowsServer"
-        },
-        {
-          "field": "Microsoft.Compute/imageSKU",
-          "in": [
-            "2008-R2-SP1",
-            "2008-R2-SP1-smalldisk",
-            "2012-Datacenter",
-            "2012-Datacenter-smalldisk",
-            "2012-R2-Datacenter",
-            "2012-R2-Datacenter-smalldisk",
-            "2016-Datacenter",
-            "2016-Datacenter-Server-Core",
-            "2016-Datacenter-Server-Core-smalldisk",
-            "2016-Datacenter-smalldisk",
-            "2016-Datacenter-with-Containers",
-            "2016-Datacenter-with-RDSH"
-          ]
-        }
-      ]
-    },
-    "then": {
-      "effect": "deployIfNotExists",
-      "details": {
-        "type": "Microsoft.RecoveryServices/backupprotecteditems",
-        "existenceCondition": {
-          "allOf": [
-            {
-              "field": "name",
-              "like": "*"
-            }
-          ]
-        },
-        "roleDefinitionIds": [
-          "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
-        ],
-        "deployment": {
-          "properties": {
-            "mode": "incremental",
-            "template": {
-              "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
-              "contentVersion": "1.0.0.0",
-              "parameters": {
-                "VMName": {
-                  "type": "string"
-                },
-                "VMRG": {
-                  "type": "string"
-                },
-                "BackupVaultRGName": {
-                  "type": "string"
-                },
-                "BackupVaultName": {
-                  "type": "string"
-                },
-                "BackupPolicyName": {
-                  "type": "string"
+    "schema": "https://schema.management.azure.com/schemas/2018-05-01/policyDefinition.json#",
+    "properties": {
+        "displayName": "Enforce Azure Backup on Linux VM's",
+        "policyType": "Custom",
+        "mode": "All",
+        "parameters": {
+            "BackupVaultRGName": {
+                "type": "String",
+                "metadata": {
+                    "displayName": "Backup Vault Resource Group Name",
+                    "description": "Resource Group in which the backup vault resides"
                 }
-              },
-              "variables": {
-                "BackupIntentConcat": "[concat('/Azure/vm;iaasvmcontainerv2;',parameters('VMRG'),';',parameters('VMName'))]"
-              },
-              "resources": [
-                {
-                  "apiVersion": "2017-05-10",
-                  "name": "[concat(parameters('VMName'), '-' , 'BackupIntent')]",
-                  "type": "Microsoft.Resources/deployments",
-                  "resourceGroup": "[parameters('BackupVaultRGName')]",
-                  "properties": {
-                    "mode": "Incremental",
-                    "template": {
-                      "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
-                      "contentVersion": "1.0.0.0",
-                      "resources": [
-                        {
-                          "name": "[concat(parameters('BackupVaultName'),variables('BackupIntentConcat'))]",
-                          "apiVersion": "2017-07-01",
-                          "type": "Microsoft.RecoveryServices/vaults/backupFabrics/backupProtectionIntent",
-                          "properties": {
-                            "protectionIntentItemType": "AzureResourceItem",
-                            "policyId": "[concat(resourceId('Microsoft.RecoveryServices/vaults/backuppolicies',parameters('BackupVaultName'),parameters('BackupPolicyName')))]",
-                            "sourceResourceId": "[concat(resourceId('Microsoft.Compute/virtualMachines',parameters('VMName')))]"
-                          }
-                        }
-                      ]
-                    }
-                  }
-                }
-              ]
             },
-            "parameters": {
-              "VMName": {
-                "value": "[field('name')]"
-              },
-              "VMRG": {
-                "value": "[resourcegroup().name]"
-              },
-              "BackupVaultRGName": {
-                "value": "[parameters('BackupVaultRGName')]"
-              },
-              "BackupVaultName": {
-                "value": "[parameters('BackupVaultName')]"
-              },
-              "BackupPolicyName": {
-                "value": "[parameters('BackupPolicyName')]"
-              }
+            "BackupVaultName": {
+                "type": "String",
+                "metadata": {
+                    "displayName": "Backup Vault Name",
+                    "description": "Target backup vault for VM backup onboarding"
+                }
+            },
+            "BackupPolicyName": {
+                "type": "String",
+                "metadata": {
+                    "displayName": "Backup Policy Name",
+                    "description": "Target backup policy for VM backup onboarding"
+                }
             }
-          }
+        },
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Compute/virtualMachines"
+                    },
+                    {
+                        "anyOf": [
+                            {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Compute/imagePublisher",
+                                        "equals": "RedHat"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageOffer",
+                                        "in": [
+                                            "RHEL",
+                                            "RHEL-SAP-HANA"
+                                        ]
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "6.*"
+                                            },
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "7*"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Compute/imagePublisher",
+                                        "equals": "SUSE"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageOffer",
+                                        "in": [
+                                            "SLES",
+                                            "SLES-HPC",
+                                            "SLES-HPC-Priority",
+                                            "SLES-SAP",
+                                            "SLES-SAP-BYOS",
+                                            "SLES-Priority",
+                                            "SLES-BYOS",
+                                            "SLES-SAPCAL",
+                                            "SLES-Standard"
+                                        ]
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "12*"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Compute/imagePublisher",
+                                        "equals": "Canonical"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageOffer",
+                                        "equals": "UbuntuServer"
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "14.04*LTS"
+                                            },
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "16.04*LTS"
+                                            },
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "18.04*LTS"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Compute/imagePublisher",
+                                        "equals": "Oracle"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageOffer",
+                                        "equals": "Oracle-Linux"
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "6.*"
+                                            },
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "7.*"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Compute/imagePublisher",
+                                        "equals": "OpenLogic"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageOffer",
+                                        "in": [
+                                            "CentOS",
+                                            "Centos-LVM",
+                                            "CentOS-SRIOV"
+                                        ]
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "6.*"
+                                            },
+                                            {
+                                                "field": "Microsoft.Compute/imageSKU",
+                                                "like": "7*"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Compute/imagePublisher",
+                                        "equals": "cloudera"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageOffer",
+                                        "equals": "cloudera-centos-os"
+                                    },
+                                    {
+                                        "field": "Microsoft.Compute/imageSKU",
+                                        "like": "7*"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "then": {
+                "effect": "deployIfNotExists",
+                "details": {
+                    "type": "Microsoft.RecoveryServices/backupprotecteditems",
+                    "existenceCondition": {
+                        "allOf": [
+                            {
+                                "field": "name",
+                                "like": "*"
+                            }
+                        ]
+                    },
+                    "roleDefinitionIds": [
+                        "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+                    ],
+                    "deployment": {
+                        "properties": {
+                            "mode": "incremental",
+                            "template": {
+                                "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                                "contentVersion": "1.0.0.0",
+                                "parameters": {
+                                    "VMName": {
+                                        "type": "string"
+                                    },
+                                    "VMRG": {
+                                        "type": "string"
+                                    },
+                                    "BackupVaultRGName": {
+                                        "type": "string"
+                                    },
+                                    "BackupVaultName": {
+                                        "type": "string"
+                                    },
+                                    "BackupPolicyName": {
+                                        "type": "string"
+                                    }
+                                },
+                                "variables": {
+                                    "BackupIntentConcat": "[concat('/Azure/vm;iaasvmcontainerv2;',parameters('VMRG'),';',parameters('VMName'))]"
+                                },
+                                "resources": [
+                                    {
+                                        "apiVersion": "2017-05-10",
+                                        "name": "[concat(parameters('VMName'), '-' , 'BackupIntent')]",
+                                        "type": "Microsoft.Resources/deployments",
+                                        "resourceGroup": "[parameters('BackupVaultRGName')]",
+                                        "properties": {
+                                            "mode": "Incremental",
+                                            "template": {
+                                                "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                                                "contentVersion": "1.0.0.0",
+                                                "resources": [
+                                                    {
+                                                        "name": "[concat(parameters('BackupVaultName'),variables('BackupIntentConcat'))]",
+                                                        "apiVersion": "2017-07-01",
+                                                        "type": "Microsoft.RecoveryServices/vaults/backupFabrics/backupProtectionIntent",
+                                                        "properties": {
+                                                            "protectionIntentItemType": "AzureResourceItem",
+                                                            "policyId": "[concat(resourceId('Microsoft.RecoveryServices/vaults/backuppolicies',parameters('BackupVaultName'),parameters('BackupPolicyName')))]",
+                                                            "sourceResourceId": "[concat(resourceId('Microsoft.Compute/virtualMachines',parameters('VMName')))]"
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            "parameters": {
+                                "VMName": {
+                                    "value": "[field('name')]"
+                                },
+                                "VMRG": {
+                                    "value": "[resourcegroup().name]"
+                                },
+                                "BackupVaultRGName": {
+                                    "value": "[parameters('BackupVaultRGName')]"
+                                },
+                                "BackupVaultName": {
+                                    "value": "[parameters('BackupVaultName')]"
+                                },
+                                "BackupPolicyName": {
+                                    "value": "[parameters('BackupPolicyName')]"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-      }
     }
-  }
+}
