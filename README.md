@@ -1,2 +1,2 @@
 # policy
-Azure policy
+Azure policies for Citadel labs
